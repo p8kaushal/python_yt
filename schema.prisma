@@ -1,0 +1,43 @@
+// database
+//datasource db {
+  //provider = "sqlite"
+  //url      = "file:database.db"
+//}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// generator
+generator client {
+  provider             = "prisma-client-py"
+  recursive_type_depth = 5
+}
+
+// data models
+model ContentGroup {
+  id           Int    @id @default(autoincrement())
+  ref          String
+  name         String?
+  description  String?
+  dateCreated  DateTime?
+  noOfSubs     Int?
+  source       String
+  type         String
+  contents     Content[]
+}
+
+model Content {
+  id          Int      @id @default(autoincrement())
+  grp         ContentGroup?     @relation(fields: [grpId], references: [id])
+  grpId       Int?      
+  url         String
+  length      Int?
+  viewCount   Int?
+  description String?
+  thumbnail   String?
+  title       String?
+  type        String
+}

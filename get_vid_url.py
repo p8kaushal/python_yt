@@ -4,48 +4,9 @@ import asyncio
 from prisma import Prisma
 import yt_dlp
 import whisper
-
-
 from dotenv import load_dotenv
 import os
 
-# Load a Whisper model: options are tiny, base, small, medium, large
-model = whisper.load_model("base")
-
-# Load environment variables from .env file
-load_dotenv()
-
-# # Access the variables
-# database_url = os.getenv('SUPABASE_URL')
-# api_secret = os.getenv('SUPABASE_ANON_KEY')
-
-parser = argparse.ArgumentParser(description="A script that downloads YouTube videos and stores metadata in a database.")
-parser.add_argument("-c", "--command", type=str, help="channel||playlist||search||direct", default="channel")
-parser.add_argument("-v", "--value", type=str, help="Channel ID||Playlist ID||Search Query||Direct URL", default="UCedIWVVm-tkgAoZYQiT7Fvw")
-
-args = parser.parse_args()
-print(f"Command: {args.command}")
-print(f"Value: {args.value}")
-
-match args.command.strip().lower():
-    case "channel":
-        print("Channel...")
-        videos = scrapetube.get_channel(args.value)
-
-    case "playlist":
-        print("Playlist...")
-        videos = scrapetube.get_playlist(args.value)
-
-    case "search":
-        print("Searching...")
-        videos = scrapetube.get_search(args.value)
-
-    case "direct":
-        print("extracting...")
-        videos = [{'videoId': args.value}]
-
-    case _: # Wildcard pattern, acts as a default case
-        print("Unknown command.")
 
 async def store() -> None:
     print("Storing...")
@@ -118,4 +79,42 @@ async def store() -> None:
     await prisma.disconnect()
 
 if __name__ == '__main__':
+    # Load a Whisper model: options are tiny, base, small, medium, large
+    model = whisper.load_model("base")
+
+    # Load environment variables from .env file
+    load_dotenv()
+
+    # # Access the variables
+    # database_url = os.getenv('SUPABASE_URL')
+    # api_secret = os.getenv('SUPABASE_ANON_KEY')
+
+    parser = argparse.ArgumentParser(description="A script that downloads YouTube videos and stores metadata in a database.")
+    parser.add_argument("-c", "--command", type=str, help="channel||playlist||search||direct", default="channel")
+    parser.add_argument("-v", "--value", type=str, help="Channel ID||Playlist ID||Search Query||Direct URL", default="UCedIWVVm-tkgAoZYQiT7Fvw")
+
+    args = parser.parse_args()
+    print(f"Command: {args.command}")
+    print(f"Value: {args.value}")
+
+    match args.command.strip().lower():
+        case "channel":
+            print("Channel...")
+            videos = scrapetube.get_channel(args.value)
+
+        case "playlist":
+            print("Playlist...")
+            videos = scrapetube.get_playlist(args.value)
+
+        case "search":
+            print("Searching...")
+            videos = scrapetube.get_search(args.value)
+
+        case "direct":
+            print("extracting...")
+            videos = [{'videoId': args.value}]
+
+        case _: # Wildcard pattern, acts as a default case
+            print("Unknown command.")   
+
     asyncio.run(store())

@@ -7,9 +7,12 @@ import whisper
 from dotenv import load_dotenv
 import os
 
-
 async def store() -> None:
     print("Storing...")
+
+    # Load a Whisper model: options are tiny, base, small, medium, large
+    model = whisper.load_model("base")
+
     prisma = Prisma()
     await prisma.connect()
 
@@ -34,18 +37,6 @@ async def store() -> None:
         else:
             title = video_url
 
-        content = await prisma.content.create(
-            data={
-            'grpId': contentGroup.id,
-            'title': title,
-            'description': '',
-            'url': video_url,
-            'thumbnail': '',
-            'viewCount': 0,
-            'length': 0,
-            'type': 'video',
-            },
-        )
         
         ydl_opts = {
             'format': 'bestaudio/best',
@@ -62,13 +53,42 @@ async def store() -> None:
             ydl.download([video_url])
 
         # Transcribe the audio file (supports wav, mp3, m4a, and more)
-        result = model.transcribe(f"{video['videoId']}.mp3")
+        if(args.command.strip().lower() == "direct"):
+            #to do improve this; will not work for other url types
+            video_id = video_url.split("v=")[-1]
+            audioFileName = f"{video_id}"
+        else:
+            audioFileName = f"{video['videoId']}"
+        print(f"Transcribing {audioFileName}.mp3...")
+        result = model.transcribe(f"{audioFileName}.mp3", fp16=False)
 
-        transcript_path = f"{video['videoId']}.txt"
+        transcript_path = f"{audioFileName}.txt"
         with open(transcript_path, "w", encoding="utf-8") as f:
             f.write(result.get("text", ""))
 
         print(f"Saved transcript to {transcript_path}")
+
+        # Summarize the transcript using Ollama and Gemma2
+        os.system(f"ollama run gemma2:2b \"Summarize the following text:\" < {audioFileName}.txt > {audioFileName}_summary.txt")
+        print(f"Saved summary to {audioFileName}_summary.txt")
+
+        with open(f"{audioFileName}_summary.txt", "r") as file:
+            summary = file.read()
+
+        #have to implement duplicate data handling here
+        content = await prisma.content.create(
+            data={
+            'grpId': contentGroup.id,
+            'title': title,
+            'description': '',
+            'url': video_url,
+            'thumbnail': '',
+            'viewCount': 0,
+            'length': 0,
+            'type': 'video',
+            'summary': summary if summary else None,
+            },
+        )
 
         # remove the downloaded audio file to save space
         # try:
@@ -79,9 +99,6 @@ async def store() -> None:
     await prisma.disconnect()
 
 if __name__ == '__main__':
-    # Load a Whisper model: options are tiny, base, small, medium, large
-    model = whisper.load_model("base")
-
     # Load environment variables from .env file
     load_dotenv()
 

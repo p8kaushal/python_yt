@@ -40,4 +40,5 @@ model Content {
   thumbnail   String?
   title       String?
   type        String
+  summary     String?
 }

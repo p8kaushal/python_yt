@@ -95,7 +95,7 @@ async def store() -> None:
                 print(f"Saved transcript to {transcript_path}")
 
                 # Summarize the transcript using Ollama and Gemma2
-                os.system(f"ollama run gemma2:2b \"Summarize the following text:\" < {audioFileName}.txt > {audioFileName}_summary.txt")
+                os.system(f"ollama run {model_name} \"Summarize the following text:\" < {audioFileName}.txt > {audioFileName}_summary.txt")
                 print(f"Saved summary to {audioFileName}_summary.txt")
 
                 with open(f"{audioFileName}_summary.txt", "r") as file:
@@ -140,10 +140,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="A script that downloads YouTube videos and stores metadata in a database.")
     parser.add_argument("-c", "--command", type=str, help="channel||playlist||search||direct", default="channel")
     parser.add_argument("-v", "--value", type=str, help="Channel ID||Playlist ID||Search Query||Direct URL", default="UCedIWVVm-tkgAoZYQiT7Fvw")
+    parser.add_argument("-m", "--model", type=str, help="Model name", default="gemma2:2b")
 
     args = parser.parse_args()
     print(f"Command: {args.command}")
     print(f"Value: {args.value}")
+
+    model_name = args.model
 
     match args.command.strip().lower():
         case "channel":

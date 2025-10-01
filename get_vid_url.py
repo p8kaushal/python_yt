@@ -6,6 +6,7 @@ import yt_dlp
 import whisper
 from dotenv import load_dotenv
 import os
+from datetime import datetime
 
 async def store() -> None:
     print("Storing...")
@@ -16,13 +17,28 @@ async def store() -> None:
     prisma = Prisma()
     await prisma.connect()
 
-    contentGroup = await prisma.contentgroup.create(
-        data={
-            'ref': args.value,
-            'type': 'Channel' if args.command.strip().lower() == 'channel' else 'Playlist' if args.command.strip().lower() == 'playlist' else 'Search' if args.command.strip().lower() == 'search' else 'Direct',
-            'source': 'Youtube',
-        },
-    )
+    try:
+        contentGroup = await prisma.contentgroup.upsert(
+            where={'ref': args.value},
+            data={
+                'create': {
+                    'ref': args.value,
+                    'type': 'Channel' if args.command.strip().lower() == 'channel' else 'Playlist' if args.command.strip().lower() == 'playlist' else 'Search' if args.command.strip().lower() == 'search' else 'Direct',
+                    'source': 'Youtube',
+                },
+                'update': {
+                    # this has some issues with datetime format
+                    'dateCreated': datetime.now().isoformat(),
+                },
+            },
+        )
+        print(f"Content Group: {contentGroup}")
+
+    
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    # finally:
+    #     await prisma.disconnect()
 
     for video in videos:
         if args.command.strip().lower() == "direct":
@@ -49,52 +65,67 @@ async def store() -> None:
             }]
         }
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([video_url])
-
-        # Transcribe the audio file (supports wav, mp3, m4a, and more)
-        if(args.command.strip().lower() == "direct"):
-            #to do improve this; will not work for other url types
-            video_id = video_url.split("v=")[-1]
-            audioFileName = f"{video_id}"
+        if os.path.exists(f"{video['videoId']}.mp3"):
+            print(f"Audio file {video['videoId']}.mp3 already exists. Skipping download.")
         else:
-            audioFileName = f"{video['videoId']}"
-        print(f"Transcribing {audioFileName}.mp3...")
-        result = model.transcribe(f"{audioFileName}.mp3", fp16=False)
+            print(f"Downloading audio for {video_url}...")
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([video_url])
 
-        transcript_path = f"{audioFileName}.txt"
-        with open(transcript_path, "w", encoding="utf-8") as f:
-            f.write(result.get("text", ""))
+            # Transcribe the audio file (supports wav, mp3, m4a, and more)
+            if(args.command.strip().lower() == "direct"):
+                #to do improve this; will not work for other url types
+                video_id = video_url.split("v=")[-1]
+                audioFileName = f"{video_id}"
+            else:
+                audioFileName = f"{video['videoId']}"
+            print(f"Transcribing {audioFileName}.mp3...")
 
-        print(f"Saved transcript to {transcript_path}")
+            if not os.path.exists(f"{audioFileName}.mp3"):
+                print(f"Audio file {audioFileName}.mp3 does not exist. Skipping transcription.")
+                
+            else:
+                print(f"Audio file {audioFileName}.mp3 found. Proceeding with transcription.")
+                result = model.transcribe(f"{audioFileName}.mp3", fp16=False)
 
-        # Summarize the transcript using Ollama and Gemma2
-        os.system(f"ollama run gemma2:2b \"Summarize the following text:\" < {audioFileName}.txt > {audioFileName}_summary.txt")
-        print(f"Saved summary to {audioFileName}_summary.txt")
+                transcript_path = f"{audioFileName}.txt"
+                with open(transcript_path, "w", encoding="utf-8") as f:
+                    f.write(result.get("text", ""))
 
-        with open(f"{audioFileName}_summary.txt", "r") as file:
-            summary = file.read()
+                print(f"Saved transcript to {transcript_path}")
 
-        #have to implement duplicate data handling here
-        content = await prisma.content.create(
-            data={
-            'grpId': contentGroup.id,
-            'title': title,
-            'description': '',
-            'url': video_url,
-            'thumbnail': '',
-            'viewCount': 0,
-            'length': 0,
-            'type': 'video',
-            'summary': summary if summary else None,
-            },
-        )
+                # Summarize the transcript using Ollama and Gemma2
+                os.system(f"ollama run gemma2:2b \"Summarize the following text:\" < {audioFileName}.txt > {audioFileName}_summary.txt")
+                print(f"Saved summary to {audioFileName}_summary.txt")
 
-        # remove the downloaded audio file to save space
-        # try:
-        #     os.remove(f"{video['videoId']}.mp3")
-        # except OSError:
-        #     pass
+                with open(f"{audioFileName}_summary.txt", "r") as file:
+                    summary = file.read()
+
+                try:
+                    content = await prisma.content.upsert(
+                        where={'url': video_url},
+                        data={
+                            'create': {
+                                'grpId': contentGroup.id,
+                                'title': title,
+                                'description': '',
+                                'url': video_url,
+                                'thumbnail': '',
+                                'viewCount': 0,
+                                'length': 0,
+                                'type': 'video',
+                                'summary': summary if summary else None,
+                            },
+                            'update': {
+                                #what to update here?
+                                'summary': summary if not content.get('summary') else content['summary'],
+                            },
+                        },
+                    )
+                    print(f"Content: {content}")
+                
+                except Exception as e:
+                    print(f"An error occurred: {e}")
 
     await prisma.disconnect()
 

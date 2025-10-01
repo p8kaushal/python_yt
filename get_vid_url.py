@@ -6,7 +6,6 @@ import yt_dlp
 import whisper
 from dotenv import load_dotenv
 import os
-from datetime import datetime
 
 async def store() -> None:
     print("Storing...")
@@ -17,28 +16,26 @@ async def store() -> None:
     prisma = Prisma()
     await prisma.connect()
 
-    try:
-        contentGroup = await prisma.contentgroup.upsert(
-            where={'ref': args.value},
-            data={
-                'create': {
+    contentGroup = None
+    content = None
+
+    contentGroup = await prisma.contentgroup.find_first(where={'ref': args.value})
+    if contentGroup:
+        print(f"Found content group: {contentGroup.ref} of type {contentGroup.type}")
+    else:
+        print("Content group not found...creating new one")
+        try:
+            contentGroup = await prisma.contentgroup.create(
+                data={
                     'ref': args.value,
                     'type': 'Channel' if args.command.strip().lower() == 'channel' else 'Playlist' if args.command.strip().lower() == 'playlist' else 'Search' if args.command.strip().lower() == 'search' else 'Direct',
-                    'source': 'Youtube',
-                },
-                'update': {
-                    # this has some issues with datetime format
-                    'dateCreated': datetime.now().isoformat(),
-                },
-            },
-        )
-        print(f"Content Group: {contentGroup}")
+                        'source': 'Youtube',
+                    },
+            )
+            print(f"Content Group created: {contentGroup}")
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
-    
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    # finally:
-    #     await prisma.disconnect()
 
     for video in videos:
         if args.command.strip().lower() == "direct":
@@ -101,11 +98,25 @@ async def store() -> None:
                 with open(f"{audioFileName}_summary.txt", "r") as file:
                     summary = file.read()
 
-                try:
-                    content = await prisma.content.upsert(
-                        where={'url': video_url},
-                        data={
-                            'create': {
+                content = await prisma.content.find_first(where={'url': video_url})
+                if content:
+                    print(f"Found content: {content.ref} of type {content.type}")
+                    print("Updating summary...")
+                    try:
+                        content = await prisma.content.update(
+                            where={'id': content.id},
+                            data={
+                                'summary': summary if summary else None,
+                            },
+                        )
+                        print(f"Content updated: {content}")
+                    except Exception as e:
+                        print(f"An error occurred: {e}")
+                else:
+                    print("Content not found...creating new one")
+                    try:
+                        content = await prisma.content.create(
+                            data={
                                 'grpId': contentGroup.id,
                                 'title': title,
                                 'description': '',
@@ -115,17 +126,12 @@ async def store() -> None:
                                 'length': 0,
                                 'type': 'video',
                                 'summary': summary if summary else None,
-                            },
-                            'update': {
-                                #what to update here?
-                                'summary': summary if not content.get('summary') else content['summary'],
-                            },
-                        },
-                    )
-                    print(f"Content: {content}")
-                
-                except Exception as e:
-                    print(f"An error occurred: {e}")
+                                },
+                        )
+                        print(f"Content created: {content}")
+                    
+                    except Exception as e:
+                        print(f"An error occurred: {e}")
 
     await prisma.disconnect()
 

@@ -1,4 +1,84 @@
-env
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environments
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment and Secrets
 .env
-*.txt
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+secrets.json
+
+# Media, Audio & Generated Transcripts / Summaries
 *.mp3
+*.mp4
+*.m4a
+*.wav
+*.flac
+*.webm
+*.txt
+*_summary.txt
+
+# Databases & SQLite
+*.db
+*.sqlite
+*.sqlite3
+database.db
+
+# Prisma
+prisma/*.db
+prisma/*.sqlite
+prisma/generated/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
